@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Gestor – Comparativa de Lenguas</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a1a18;min-height:100vh}
+.topbar{background:#fff;border-bottom:.5px solid #e0dfd8;padding:0 2rem;display:flex;align-items:center;gap:16px;height:56px}
+.topbar h1{font-size:15px;font-weight:600}
+.topbar span{font-size:13px;color:#aaa}
+.layout{display:grid;grid-template-columns:340px 1fr;gap:0;min-height:calc(100vh - 56px)}
+.panel-list{background:#fff;border-right:.5px solid #e0dfd8;overflow-y:auto}
+.panel-list-head{padding:1rem 1.25rem;border-bottom:.5px solid #e0dfd8;display:flex;align-items:center;justify-content:space-between}
+.panel-list-head p{font-size:13px;font-weight:500}
+.btn{padding:6px 14px;border-radius:8px;font-size:13px;cursor:pointer;border:.5px solid #d0cfc8;background:#fff;color:#1a1a18}
+.btn:hover{background:#f5f4f0}
+.btn-primary{background:#534ab7;color:#fff;border-color:transparent}
+.btn-primary:hover{background:#4840a3}
+.btn-danger{color:#a32d2d;border-color:#f0c8c8}
+.btn-danger:hover{background:#fcebeb}
+.btn-sm{padding:4px 10px;font-size:12px}
+.act-item{padding:.85rem 1.25rem;border-bottom:.5px solid #f0efe8;cursor:pointer;transition:background .1s}
+.act-item:hover{background:#fafaf7}
+.act-item.sel{background:#f0effe;border-left:3px solid #534ab7}
+.act-item .row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+.act-item .name{font-size:13px;font-weight:500}
+.act-item .meta{font-size:11px;color:#aaa}
+.badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:99px}
+.badge-i1{background:#e8f0fe;color:#3b5bdb}
+.badge-i2{background:#e8feee;color:#2a7b3d}
+.empty-list{padding:2rem;text-align:center;font-size:13px;color:#aaa}
+.panel-form{padding:2rem}
+.form-card{background:#fff;border:.5px solid #e0dfd8;border-radius:14px;padding:1.5rem;max-width:640px}
+.form-card h2{font-size:15px;font-weight:600;margin-bottom:1.25rem}
+.field{margin-bottom:1rem}
+label{font-size:12px;font-weight:500;color:#888;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+input,textarea,select{width:100%;font-family:inherit;font-size:13px;padding:8px 10px;border:.5px solid #d0cfc8;border-radius:8px;background:#fff;color:#1a1a18;outline:none}
+input:focus,textarea:focus,select:focus{border-color:#534ab7}
+textarea{resize:vertical;min-height:110px;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-actions{display:flex;gap:8px;margin-top:1.25rem}
+.divider{border:none;border-top:.5px solid #e0dfd8;margin:1.25rem 0}
+.alert{border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+.alert-ok{background:#eaf3de;color:#2a7b3d}
+.alert-err{background:#fcebeb;color:#a32d2d}
+.placeholder-form{display:flex;align-items:center;justify-content:center;height:300px;color:#aaa;font-size:14px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Gestor de actividades</h1>
+  <span>Comparativa Lengua Central</span>
+  <div style="margin-left:auto">
+    <a href="index.html" style="font-size:13px;color:#534ab7;text-decoration:none">← Ver interfaz docente</a>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="panel-list">
+    <div class="panel-list-head">
+      <p>Actividades (<span id="count">0</span>)</p>
+      <button class="btn btn-primary btn-sm" onclick="nuevaActividad()">+ Nueva</button>
+    </div>
+    <div id="act-list"><p class="empty-list">Sin actividades registradas.</p></div>
+  </div>
+
+  <div class="panel-form">
+    <div id="form-placeholder" class="placeholder-form">
+      Selecciona una actividad o crea una nueva.
+    </div>
+
+    <div class="form-card" id="form-card" style="display:none">
+      <h2 id="form-titulo">Nueva actividad</h2>
+      <div id="form-alert"></div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Quiz ID (Moodle)</label>
+          <input id="f-quizid" type="number" placeholder="ej. 12192"/>
+        </div>
+        <div class="field">
+          <label>CMID (Moodle)</label>
+          <input id="f-cmid" type="number" placeholder="ej. 206332"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Course ID (curid)</label>
+        <input id="f-curid" type="number" placeholder="ej. 2679"/>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>N° Evaluación</label>
+          <select id="f-eval">
+            <option value="">— elige —</option>
+            <option>1</option><option>2</option><option>3</option><option>4</option>
+            <option>5</option><option>6</option><option>7</option><option>8</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Intento</label>
+          <select id="f-intento">
+            <option value="">— elige —</option>
+            <option value="1">1 — primer intento</option>
+            <option value="2">2 — segundo intento</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Nombre descriptivo</label>
+        <input id="f-nombre" type="text" placeholder="ej. U2S1 P1 – Haka uchu"/>
+      </div>
+
+      <div class="field">
+        <label>Texto correcto (transcripción guía)</label>
+        <textarea id="f-texto" placeholder="Pega aquí la transcripción correcta..."></textarea>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="guardar()">Guardar</button>
+        <button class="btn btn-danger btn-sm" id="btn-eliminar" onclick="eliminar()" style="display:none">Eliminar</button>
+        <button class="btn btn-sm" onclick="cancelar()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "__API_BASE__";
+let actividades  = [];
+let editQuizid   = null;
+
+async function cargar() {
+  const r = await fetch(`${API}/api/actividades`);
+  actividades = await r.json();
+  renderLista();
+}
+
+function renderLista() {
+  document.getElementById("count").textContent = actividades.length;
+  const el = document.getElementById("act-list");
+  if (!actividades.length) {
+    el.innerHTML = '<p class="empty-list">Sin actividades registradas.</p>';
+    return;
+  }
+  el.innerHTML = actividades.map(a => `
+    <div class="act-item ${editQuizid === a.quizid ? 'sel' : ''}" onclick="editarActividad(${a.quizid})">
+      <div class="row1">
+        <span class="name">${a.nombre || `Eval ${a.numero_eval} · Int. ${a.numero_intento}`}</span>
+        <span class="badge ${a.numero_intento === 1 ? 'badge-i1' : 'badge-i2'}">Int. ${a.numero_intento}</span>
+      </div>
+      <div class="meta">quizid: ${a.quizid} · cmid: ${a.cmid} · curid: ${a.curid} · Eval ${a.numero_eval}/8</div>
+    </div>`).join("");
+}
+
+function setAlert(msg, tipo="ok") {
+  document.getElementById("form-alert").innerHTML =
+    msg ? `<div class="alert alert-${tipo}">${msg}</div>` : "";
+}
+
+function mostrarForm() {
+  document.getElementById("form-placeholder").style.display = "none";
+  document.getElementById("form-card").style.display = "";
+}
+
+function nuevaActividad() {
+  editQuizid = null;
+  limpiarForm();
+  document.getElementById("form-titulo").textContent = "Nueva actividad";
+  document.getElementById("btn-eliminar").style.display = "none";
+  mostrarForm();
+  renderLista();
+}
+
+function editarActividad(quizid) {
+  const a = actividades.find(x => x.quizid === quizid);
+  editQuizid = quizid;
+  document.getElementById("f-quizid").value   = a.quizid;
+  document.getElementById("f-cmid").value     = a.cmid;
+  document.getElementById("f-curid").value    = a.curid;
+  document.getElementById("f-eval").value     = a.numero_eval;
+  document.getElementById("f-intento").value  = a.numero_intento;
+  document.getElementById("f-nombre").value   = a.nombre || "";
+  document.getElementById("f-texto").value    = a.texto_correcto;
+  document.getElementById("form-titulo").textContent = `Editando: ${a.nombre || "quizid " + quizid}`;
+  document.getElementById("btn-eliminar").style.display = "";
+  setAlert("");
+  mostrarForm();
+  renderLista();
+}
+
+function limpiarForm() {
+  ["f-quizid","f-cmid","f-curid","f-nombre","f-texto"].forEach(id =>
+    document.getElementById(id).value = "");
+  document.getElementById("f-eval").value    = "";
+  document.getElementById("f-intento").value = "";
+  setAlert("");
+}
+
+function cancelar() {
+  editQuizid = null;
+  limpiarForm();
+  document.getElementById("form-placeholder").style.display = "";
+  document.getElementById("form-card").style.display = "none";
+  renderLista();
+}
+
+async function guardar() {
+  const body = {
+    quizid:         parseInt(document.getElementById("f-quizid").value),
+    cmid:           parseInt(document.getElementById("f-cmid").value),
+    curid:          parseInt(document.getElementById("f-curid").value),
+    numero_eval:    parseInt(document.getElementById("f-eval").value),
+    numero_intento: parseInt(document.getElementById("f-intento").value),
+    nombre:         document.getElementById("f-nombre").value.trim() || null,
+    texto_correcto: document.getElementById("f-texto").value.trim(),
+  };
+
+  if (!body.quizid || !body.cmid || !body.curid || !body.numero_eval || !body.numero_intento || !body.texto_correcto) {
+    setAlert("Completa todos los campos obligatorios.", "err"); return;
+  }
+
+  const url    = editQuizid ? `${API}/api/actividades/${editQuizid}` : `${API}/api/actividades`;
+  const method = editQuizid ? "PUT" : "POST";
+  const r      = await fetch(url, { method, headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+
+  if (!r.ok) {
+    const e = await r.json();
+    setAlert(e.detail || "Error al guardar.", "err"); return;
+  }
+  setAlert("Actividad guardada correctamente.", "ok");
+  await cargar();
+  if (!editQuizid) limpiarForm();
+}
+
+async function eliminar() {
+  if (!confirm(`¿Eliminar la actividad quizid=${editQuizid}?`)) return;
+  await fetch(`${API}/api/actividades/${editQuizid}`, { method: "DELETE" });
+  cancelar();
+  await cargar();
+}
+
+cargar();
+</script>
+</body>
+</html>

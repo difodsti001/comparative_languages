@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Resultado – Evaluación Quechua Central</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a1a18;
+     min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:2.5rem 1rem}
+
+.card{background:#fff;border:.5px solid #e0dfd8;border-radius:16px;
+      padding:2rem;width:100%;max-width:520px}
+
+/* Header */
+.header{display:flex;align-items:center;gap:12px;margin-bottom:1.25rem}
+.avatar{width:46px;height:46px;border-radius:50%;background:#e8e6fe;color:#534ab7;
+        display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+.hname{font-size:16px;font-weight:600}
+.hsub{font-size:12px;color:#aaa;margin-top:2px}
+
+/* Info evaluación */
+.eval-info{background:#f8f7f4;border-radius:10px;padding:.75rem 1rem;
+           margin-bottom:1.25rem;display:flex;gap:1.5rem}
+.eval-info-item .lbl{font-size:11px;color:#aaa;text-transform:uppercase;
+                     letter-spacing:.06em;margin-bottom:2px}
+.eval-info-item .val{font-size:14px;font-weight:500}
+
+/* Spinner */
+.spinner-wrap{text-align:center;padding:2rem 0}
+.spinner{width:36px;height:36px;border-radius:50%;border:3px solid #e0dfd8;
+         border-top-color:#534ab7;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-msg{font-size:14px;color:#888}
+
+/* Sección */
+.sec-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+           color:#aaa;margin-bottom:6px}
+.text-block{background:#f8f7f4;border:.5px solid #e8e6e0;border-radius:10px;
+            padding:.9rem 1rem;font-size:14px;line-height:1.7;color:#333;
+            white-space:pre-wrap;word-break:break-word;margin-bottom:1.25rem}
+.text-block.correcto{background:#f3fbea;border-color:#c8e8b0}
+
+.divider{border:none;border-top:.5px solid #e0dfd8;margin:1.25rem 0}
+
+/* Puntaje */
+.puntaje-row{display:flex;align-items:center;justify-content:space-between}
+.puntaje-lbl{font-size:14px;color:#555}
+.puntaje-val{font-size:32px;font-weight:700;line-height:1}
+.puntaje-val.ok{color:#2e6b0d}
+.puntaje-val.err{color:#a32d2d}
+.puntaje-tag{font-size:12px;font-weight:500;padding:3px 10px;border-radius:99px;margin-top:4px;display:inline-block}
+.puntaje-tag.ok{background:#eaf3de;color:#2e6b0d}
+.puntaje-tag.err{background:#fcebeb;color:#a32d2d}
+
+/* Error */
+.error-box{background:#fcebeb;border-radius:10px;padding:1rem 1.25rem;font-size:14px;color:#a32d2d}
+.error-box strong{display:block;margin-bottom:4px;font-size:15px}
+
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="avatar" id="avatar">?</div>
+    <div>
+      <div class="hname" id="hname">Cargando...</div>
+      <div class="hsub">Evaluación de escritura</div>
+    </div>
+  </div>
+
+  <!-- Info evaluación -->
+  <div class="eval-info hidden" id="eval-info">
+    <div class="eval-info-item">
+      <div class="lbl">Evaluación</div>
+      <div class="val" id="info-eval">–</div>
+    </div>
+    <div class="eval-info-item">
+      <div class="lbl">Intento</div>
+      <div class="val" id="info-intento">–</div>
+    </div>
+  </div>
+
+  <!-- Cargando -->
+  <div id="est-cargando">
+    <div class="spinner-wrap">
+      <div class="spinner"></div>
+      <p class="spinner-msg" id="msg-carga">Verificando resultado...</p>
+    </div>
+  </div>
+
+  <!-- Resultado -->
+  <div id="est-resultado" class="hidden">
+
+    <!-- Tu respuesta -->
+    <p class="sec-label">Tu respuesta</p>
+    <div class="text-block" id="bloque-docente">–</div>
+
+    <!-- Texto correcto (solo intento 2) -->
+    <div id="bloque-correcto-wrap" class="hidden">
+      <p class="sec-label">Transcripción correcta</p>
+      <div class="text-block correcto" id="bloque-correcto">–</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Puntaje -->
+    <div class="puntaje-row">
+      <span class="puntaje-lbl">Puntaje obtenido</span>
+      <div style="text-align:right">
+        <div class="puntaje-val" id="puntaje-val">–</div>
+        <span class="puntaje-tag" id="puntaje-tag">–</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Error -->
+  <div id="est-error" class="hidden">
+    <div class="error-box">
+      <strong>No se pudo cargar el resultado</strong>
+      <span id="msg-error">Error desconocido.</span>
+    </div>
+  </div>
+
+</div>
+<script>
+const API = "__API_BASE__";
+
+const p          = new URLSearchParams(window.location.search);
+const id_user    = parseInt(p.get("id_user")    || "0");
+const quizid = parseInt(p.get("quizid") || "0");
+const cmid       = parseInt(p.get("cmid")       || "0");
+const curid      = parseInt(p.get("curid")      || "0");
+const nombre     = p.get("nombre_usuario")       || "Docente";
+
+// Header
+document.getElementById("hname").textContent = nombre;
+document.getElementById("avatar").textContent =
+  nombre.trim().split(/\s+/).slice(0,2).map(w => w[0]).join("").toUpperCase();
+
+const $ = id => document.getElementById(id);
+
+function mostrarEstado(id) {
+  ["est-cargando","est-resultado","est-error"].forEach(i => $(i).classList.add("hidden"));
+  $(id).classList.remove("hidden");
+}
+
+function mostrarInfoEval(data) {
+  $("info-eval").textContent    = `${data.numero_eval} de 8`;
+  $("info-intento").textContent = data.numero_intento;
+  $("eval-info").classList.remove("hidden");
+}
+
+function renderResultado(data) {
+  mostrarInfoEval(data);
+
+  // Tu respuesta
+  $("bloque-docente").textContent = data.texto_docente || "(sin respuesta registrada)";
+
+  // Texto correcto solo en intento 2
+  if (data.texto_correcto) {
+    $("bloque-correcto").textContent = data.texto_correcto;
+    $("bloque-correcto-wrap").classList.remove("hidden");
+  } else {
+    $("bloque-correcto-wrap").classList.add("hidden");
+  }
+
+  // Puntaje
+  const ok = data.puntaje === 1;
+  $("puntaje-val").textContent = ok ? "1 / 1" : "0 / 1";
+  $("puntaje-val").className   = "puntaje-val " + (ok ? "ok" : "err");
+  $("puntaje-tag").textContent = ok ? "Correcto" : "Incorrecto";
+  $("puntaje-tag").className   = "puntaje-tag " + (ok ? "ok" : "err");
+
+  mostrarEstado("est-resultado");
+}
+
+function mostrarError(msg) {
+  $("msg-error").textContent = msg;
+  mostrarEstado("est-error");
+}
+
+(async () => {
+  if (!id_user || !quizid || !cmid) {
+    mostrarError("Parámetros incompletos en la URL (id_user, quizid y cmid son requeridos).");
+    return;
+  }
+
+  // 1. ¿Ya existe resultado?
+  $("msg-carga").textContent = "Verificando resultado previo...";
+  try {
+    const r    = await fetch(`${API}/api/resultado/${quizid}/${id_user}`);
+    if (!r.ok) { mostrarError((await r.json()).detail || "Error al consultar."); return; }
+    const data = await r.json();
+
+    if (data.existe) { renderResultado(data); return; }
+
+    // Mostrar info de eval aunque no haya resultado aún
+    mostrarInfoEval(data);
+  } catch {
+    mostrarError("No se pudo conectar con el servidor.");
+    return;
+  }
+
+  // 2. No existe → comparar y guardar
+  $("msg-carga").textContent = "Obteniendo tu respuesta desde Moodle...";
+  try {
+    const r = await fetch(`${API}/api/comparar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmid, quizid, curid, id_user, nombre_usuario: nombre }),
+    });
+    if (!r.ok) { mostrarError((await r.json()).detail || "Error al comparar."); return; }
+    renderResultado(await r.json());
+  } catch {
+    mostrarError("Error de red al procesar la evaluación.");
+  }
+})();
+</script>
+</body>
+</html>
