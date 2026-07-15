@@ -53,9 +53,11 @@ async def init_db():
             id_user        INTEGER      NOT NULL,
             numero_eval    SMALLINT     NOT NULL,
             numero_intento SMALLINT     NOT NULL,
-            puntaje        SMALLINT     NOT NULL CHECK (puntaje IN (0, 1)),
-            texto_docente  TEXT,
-            fecha          TIMESTAMPTZ  DEFAULT NOW(),
+            puntaje            SMALLINT     NOT NULL CHECK (puntaje IN (0, 1)),
+            aciertos           INTEGER      NOT NULL DEFAULT 0,
+            porcentaje_acierto NUMERIC(5,2) NOT NULL DEFAULT 0,
+            texto_docente      TEXT,
+            fecha              TIMESTAMPTZ  DEFAULT NOW(),
             CONSTRAINT uq_resultado UNIQUE (quizid, id_user)
         );
 
@@ -113,13 +115,23 @@ def normalizar(texto: str) -> list[str]:
     texto = re.sub(r"\s+", " ", texto)
     return [w for w in texto.strip().split() if w]
 
-def comparar(texto_correcto: str, texto_docente: str) -> int:
+def comparar(texto_correcto: str, texto_docente: str) -> dict:
     from difflib import SequenceMatcher
-    matcher = SequenceMatcher(None, normalizar(texto_correcto), normalizar(texto_docente))
-    for tag, *_ in matcher.get_opcodes():
-        if tag in ("replace", "delete"):
-            return 0
-    return 1
+    esperado = normalizar(texto_correcto)
+    recibido = normalizar(texto_docente)
+    total    = len(esperado)
+
+    matcher  = SequenceMatcher(None, esperado, recibido)
+    aciertos = sum(i2 - i1 for tag, i1, i2, j1, j2 in matcher.get_opcodes() if tag == "equal")
+
+    porcentaje = round((aciertos / total * 100), 2) if total > 0 else 0.0
+    puntaje    = 1 if aciertos == total else 0
+
+    return {
+        "puntaje":            puntaje,
+        "aciertos":           aciertos,
+        "porcentaje_acierto": porcentaje,
+    }
 
 
 # ──────────────────────────────────────────────
@@ -336,15 +348,17 @@ async def comparar_y_guardar(req: ComparativaRequest):
             return {"ya_existia": True, **build_respuesta(act, existente)}
 
     texto_docente = await obtener_texto_moodle(req.quizid, req.id_user)
-    puntaje       = comparar(act["texto_correcto"], texto_docente)
+    cmp           = comparar(act["texto_correcto"], texto_docente)
 
     async with pool.acquire() as conn:
         await conn.execute(
             """INSERT INTO qch_resultados
-                   (quizid, cmid, curid, id_user, numero_eval, numero_intento, puntaje, texto_docente)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)""",
+                   (quizid, cmid, curid, id_user, numero_eval, numero_intento,
+                    puntaje, aciertos, porcentaje_acierto, texto_docente)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)""",
             req.quizid, req.cmid, req.curid,
-            req.id_user, act["numero_eval"], act["numero_intento"], puntaje, texto_docente
+            req.id_user, act["numero_eval"], act["numero_intento"],
+            cmp["puntaje"], cmp["aciertos"], cmp["porcentaje_acierto"], texto_docente
         )
         res = row_to_dict(await conn.fetchrow(
             "SELECT * FROM qch_resultados WHERE quizid=$1 AND id_user=$2",
