@@ -110,8 +110,8 @@ class ComparativaRequest(BaseModel):
 # ──────────────────────────────────────────────
 def normalizar(texto: str) -> list[str]:
     texto = texto.lower()
-    texto = re.sub(r"[.,;:¡!¿?\"'()\[\]{}«»\-]", "", texto)
-    texto = texto.replace("\n", " ")
+    texto = re.sub(r"[.,;:¡!¿?\"()\[\]{}«»\-]", "", texto)
+    texto = re.sub(r"[\n\r\t]", " ", texto)
     texto = re.sub(r"\s+", " ", texto)
     return [w for w in texto.strip().split() if w]
 
