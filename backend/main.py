@@ -216,7 +216,14 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
 
                     # Quedarse con el texto más largo (más completo)
                     if candidatos:
-                        return max(candidatos, key=len)
+                        # Limpiar prefijo de accesibilidad en todos los candidatos
+                        candidatos = [
+                            re.sub(r"^Texto de la respuesta Pregunta\s*\d+\s*", "", c).strip()
+                            for c in candidatos
+                        ]
+                        candidatos = [c for c in candidatos if c]  # filtrar vacíos
+                        if candidatos:
+                            return max(candidatos, key=len)
 
                 except Exception as e:
                     print(f"[ERROR] BeautifulSoup: {e}")
