@@ -159,7 +159,7 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
         attempts = attempts_data.get("attempts", [])
         if not attempts:
             raise HTTPException(404,
-                f"No se encontraron intentos")
+                f"No se encontraron intentos para userid={id_user} en quizid={quizid}")
 
         finished   = [a for a in attempts if a.get("state") == "finished"]
         inprogress = [a for a in attempts if a.get("state") == "inprogress"]
@@ -176,57 +176,60 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
                                    {"attemptid": attempt["id"], "page": -1})
 
     for question in review.get("questions", []):
+        print(f"[DEBUG] type={question.get('type')} slot={question.get('slot')}")
         if question.get("type") == "essay":
             html = question.get("html", "")
+            print(f"[DEBUG] html length={len(html)}")
             if html:
                 try:
                     from bs4 import BeautifulSoup
                     soup = BeautifulSoup(html, "html.parser")
                     candidatos = []
 
-                    # Fuente 1: textarea con clase específica de essay
                     textarea = soup.find("textarea", class_="qtype_essay_response")
                     if not textarea:
                         textarea = soup.find("textarea", attrs={"readonly": True})
+                    print(f"[DEBUG] textarea encontrado={textarea is not None}")
                     if textarea:
                         t = textarea.get_text(strip=True)
+                        print(f"[DEBUG] textarea texto={repr(t[:100])}")
                         if t:
                             candidatos.append(t)
 
-                    # Fuente 2: historial "Guardada:" con re.DOTALL para múltiples líneas
                     texto_plano = soup.get_text(" ", strip=True)
                     match = re.search(
                         r"Guardada:\s*(.+?)\s*(?:Respuesta guardada|Intento finalizado)",
                         texto_plano,
                         re.DOTALL
                     )
+                    print(f"[DEBUG] match guardada={match is not None}")
                     if match:
                         t = match.group(1).strip()
+                        print(f"[DEBUG] match texto={repr(t[:100])}")
                         if t:
                             candidatos.append(t)
 
-                    # Fuente 3: div de respuesta essay
                     answer_div = soup.find("div", class_=["answer", "qtype_essay_response"])
                     if answer_div:
                         t = answer_div.get_text(" ", strip=True)
                         if t:
                             candidatos.append(t)
 
-                    # Quedarse con el texto más largo (más completo)
+                    print(f"[DEBUG] total candidatos={len(candidatos)}")
                     if candidatos:
                         return max(candidatos, key=len)
 
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[DEBUG] excepcion={e}")
 
-            # Fallback: responsesummary
             texto = (question.get("responsesummary") or "").strip()
+            print(f"[DEBUG] responsesummary={repr(texto[:100]) if texto else 'vacío'}")
             if texto:
                 return texto
 
+    print(f"[DEBUG] questions total={len(review.get('questions', []))}")
     raise HTTPException(422,
-        f"No se encontró respuesta.")
-
+        f"No se encontró respuesta essay para userid={id_user} en quizid={quizid}")
 
 # ──────────────────────────────────────────────
 # HELPERS
