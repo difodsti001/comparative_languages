@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from typing import Optional
 from contextlib import asynccontextmanager
 from pathlib import Path
+from bs4 import BeautifulSoup
 import httpx, re, asyncpg, os
 from dotenv import load_dotenv
 
@@ -24,7 +25,7 @@ MOODLE_TOKEN = os.getenv("MOODLE_TOKEN", "TU_TOKEN_WEBSERVICE")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/quechua_db")
 API_HOST     = os.getenv("API_HOST",     "http://localhost")
 API_PORT     = os.getenv("API_PORT",     "9005")
-API_BASE     = f"{API_HOST}:{API_PORT}"   # usado por los HTML
+API_BASE     = f"{API_HOST}:{API_PORT}"
 
 
 # ──────────────────────────────────────────────
@@ -46,13 +47,13 @@ async def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS qch_resultados (
-            id             SERIAL PRIMARY KEY,
-            quizid         INTEGER      NOT NULL,
-            cmid           INTEGER      NOT NULL,
-            curid          INTEGER      NOT NULL,
-            id_user        INTEGER      NOT NULL,
-            numero_eval    SMALLINT     NOT NULL,
-            numero_intento SMALLINT     NOT NULL,
+            id                 SERIAL PRIMARY KEY,
+            quizid             INTEGER      NOT NULL,
+            cmid               INTEGER      NOT NULL,
+            curid              INTEGER      NOT NULL,
+            id_user            INTEGER      NOT NULL,
+            numero_eval        SMALLINT     NOT NULL,
+            numero_intento     SMALLINT     NOT NULL,
             puntaje            SMALLINT     NOT NULL CHECK (puntaje IN (0, 1)),
             aciertos           INTEGER      NOT NULL DEFAULT 0,
             porcentaje_acierto NUMERIC(5,2) NOT NULL DEFAULT 0,
@@ -110,6 +111,8 @@ class ComparativaRequest(BaseModel):
 # ──────────────────────────────────────────────
 def normalizar(texto: str) -> list[str]:
     texto = texto.lower()
+    # Se eliminan signos de puntuación EXCEPTO el apóstrofe (')
+    # que es vital en lenguas originarias (ej: llank'ay, misk'i)
     texto = re.sub(r"[.,;:¡!¿?\"()\[\]{}«»\-]", "", texto)
     texto = re.sub(r"[\n\r\t]", " ", texto)
     texto = re.sub(r"\s+", " ", texto)
@@ -225,6 +228,7 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
 
     raise HTTPException(422,
         f"No se encontró respuesta essay para userid={id_user} en quizid={quizid}")
+
 
 # ──────────────────────────────────────────────
 # HELPERS
@@ -382,7 +386,8 @@ async def resumen_curso(curid: int):
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """SELECT r.id_user, r.numero_eval, r.numero_intento,
-                      r.puntaje, r.texto_docente, r.fecha
+                      r.puntaje, r.aciertos, r.porcentaje_acierto,
+                      r.texto_docente, r.fecha
                FROM qch_resultados r
                WHERE r.curid = $1
                ORDER BY r.id_user, r.numero_eval, r.numero_intento""",
