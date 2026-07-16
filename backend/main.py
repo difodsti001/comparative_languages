@@ -184,17 +184,20 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
                     soup = BeautifulSoup(html, "html.parser")
 
                     # 1. textarea — texto completo con acentos correctos
-                    textarea = soup.find("textarea")
+                    textarea = soup.find("textarea", class_="qtype_essay_response")
+                    if not textarea:
+                        textarea = soup.find("textarea", attrs={"readonly": True})
                     if textarea:
                         texto = textarea.get_text(strip=True)
                         if texto:
                             return texto
-
-                    # 2. historial "Guardada: <texto>"
+                    
+                    # 2. historial "Guardada: <texto>" — re.DOTALL para capturar múltiples líneas
                     texto_plano = soup.get_text(" ", strip=True)
                     match = re.search(
-                        r"Guardada:\s*(.+?)\s*(?:Respuesta guardada|Intento finalizado|$)",
-                        texto_plano
+                        r"Guardada:\s*(.+?)\s*(?:Respuesta guardada|Intento finalizado)",
+                        texto_plano,
+                        re.DOTALL
                     )
                     if match:
                         texto = match.group(1).strip()
