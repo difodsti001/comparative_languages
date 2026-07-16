@@ -173,7 +173,7 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
             attempt = sorted(inprogress, key=lambda x: x.get("timemodified", 0))[-1]
         else:
             raise HTTPException(422,
-                f"El usuario userid={id_user} no tiene intentos finalizados en quizid={quizid}")
+                f"El usuario no tiene intentos finalizados")
 
         review = await _moodle_get(client, "mod_quiz_get_attempt_review",
                                    {"attemptid": attempt["id"], "page": -1})
@@ -186,24 +186,24 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
                     soup = BeautifulSoup(html, "html.parser")
                     candidatos = []
 
-                    # Fuente 1: textarea con clase específica — solo su contenido directo
+                    # Fuente 1: textarea con clase específica de essay
                     textarea = soup.find("textarea", class_="qtype_essay_response")
                     if not textarea:
                         textarea = soup.find("textarea", attrs={"readonly": True})
                     if textarea:
                         t = (textarea.string or textarea.get_text(strip=True)).strip()
+                        # Limpiar prefijo de accesibilidad que Moodle puede incluir
+                        t = re.sub(r"^Texto de la respuesta Pregunta\s*\d+\s*", "", t).strip()
                         if t:
                             candidatos.append(t)
 
-                    # Fuente 2: historial "Guardada:" con re.DOTALL para múltiples líneas
+                    # Fuente 2: historial "Guardada:" — split más robusto que regex para multilínea
                     texto_plano = soup.get_text(" ", strip=True)
-                    match = re.search(
-                        r"Guardada:\s*(.+?)\s*(?:Respuesta guardada|Intento finalizado)",
-                        texto_plano,
-                        re.DOTALL
-                    )
-                    if match:
-                        t = match.group(1).strip()
+                    if "Guardada:" in texto_plano:
+                        t = texto_plano.split("Guardada:")[-1].strip()
+                        for corte in ["Respuesta guardada", "Intento finalizado"]:
+                            if corte in t:
+                                t = t.split(corte)[0].strip()
                         if t:
                             candidatos.append(t)
 
@@ -227,7 +227,7 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
                 return texto
 
     raise HTTPException(422,
-        f"No se encontró respuesta essay para userid={id_user} en quizid={quizid}")
+        f"No se encontró respuesta")
 
 
 # ──────────────────────────────────────────────
