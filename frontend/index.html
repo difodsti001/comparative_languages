@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Resultado – Evaluación Quechua Central</title>
+<title>Resultado – Evaluación Central</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a1a18;
@@ -180,6 +180,9 @@ function renderResultado(data) {
 }
 
 function mostrarError(msg) {
+  if (msg.includes("No se encontraron intentos")) {
+    msg = "Aún no has respondido esta actividad. Completa la actividad correspondiente.";
+  } 
   $("msg-error").textContent = msg;
   mostrarEstado("est-error");
 }
@@ -207,7 +210,7 @@ function mostrarError(msg) {
   }
 
   // 2. No existe → comparar y guardar
-  $("msg-carga").textContent = "Obteniendo tu respuesta desde Moodle...";
+  $("msg-carga").textContent = "Obteniendo tu respuesta...";
   try {
     const r = await fetch(`${API}/api/comparar`, {
       method: "POST",
