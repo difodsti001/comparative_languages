@@ -4,15 +4,17 @@ FastAPI + PostgreSQL (asyncpg)
 Los HTML se sirven dinámicamente desde endpoints para inyectar la URL de la API.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from contextlib import asynccontextmanager
 from pathlib import Path
 from bs4 import BeautifulSoup
-import httpx, re, asyncpg, os
+import httpx, re, asyncpg, os, io
+import openpyxl
+from openpyxl.utils import get_column_letter
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -111,8 +113,8 @@ class ComparativaRequest(BaseModel):
 # ──────────────────────────────────────────────
 def normalizar(texto: str) -> list[str]:
     texto = texto.lower()
-    # Se eliminan signos de puntuación EXCEPTO el apóstrofe (')
-    # que es vital en lenguas originarias (ej: llank'ay, misk'i)
+    # Eliminar puntuación EXCEPTO apóstrofe (') y saltillo (`)
+    # que son vitales en lenguas originarias (quechua, aymara)
     texto = re.sub(r"[.,;:¡!¿?\"()\[\]{}«»\-]", "", texto)
     texto = re.sub(r"[\n\r\t]", " ", texto)
     texto = re.sub(r"\s+", " ", texto)
@@ -173,7 +175,7 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
             attempt = sorted(inprogress, key=lambda x: x.get("timemodified", 0))[-1]
         else:
             raise HTTPException(422,
-                f"El usuario no tiene intentos finalizados")
+                f"El usuario userid={id_user} no tiene intentos finalizados en quizid={quizid}")
 
         review = await _moodle_get(client, "mod_quiz_get_attempt_review",
                                    {"attemptid": attempt["id"], "page": -1})
@@ -192,12 +194,11 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
                         textarea = soup.find("textarea", attrs={"readonly": True})
                     if textarea:
                         t = (textarea.string or textarea.get_text(strip=True)).strip()
-                        # Limpiar prefijo de accesibilidad que Moodle puede incluir
                         t = re.sub(r"^Texto de la respuesta Pregunta\s*\d+\s*", "", t).strip()
                         if t:
                             candidatos.append(t)
 
-                    # Fuente 2: historial "Guardada:" — split más robusto que regex para multilínea
+                    # Fuente 2: historial "Guardada:" — split robusto para multilínea
                     texto_plano = soup.get_text(" ", strip=True)
                     if "Guardada:" in texto_plano:
                         t = texto_plano.split("Guardada:")[-1].strip()
@@ -214,14 +215,13 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
                         if t:
                             candidatos.append(t)
 
-                    # Quedarse con el texto más largo (más completo)
+                    # Limpiar prefijo de accesibilidad y quedarse con el más largo
                     if candidatos:
-                        # Limpiar prefijo de accesibilidad en todos los candidatos
                         candidatos = [
                             re.sub(r"^Texto de la respuesta Pregunta\s*\d+\s*", "", c).strip()
                             for c in candidatos
                         ]
-                        candidatos = [c for c in candidatos if c]  # filtrar vacíos
+                        candidatos = [c for c in candidatos if c]
                         if candidatos:
                             return max(candidatos, key=len)
 
@@ -234,7 +234,7 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
                 return texto
 
     raise HTTPException(422,
-        f"No se encontró respuesta")
+        f"No se encontró respuesta essay para userid={id_user} en quizid={quizid}")
 
 
 # ──────────────────────────────────────────────
@@ -259,7 +259,7 @@ def build_respuesta(act: dict, res: dict) -> dict:
 
 
 # ──────────────────────────────────────────────
-# ENDPOINTS — PÁGINAS HTML (inyectan API_BASE)
+# ENDPOINTS — PÁGINAS HTML
 # ──────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def pagina_resultado():
@@ -331,6 +331,119 @@ async def eliminar_actividad(quizid: int):
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM qch_actividades WHERE quizid=$1", quizid)
     return {"ok": True}
+
+
+# ──────────────────────────────────────────────
+# ENDPOINT — DESCARGAR PLANTILLA EXCEL
+# ──────────────────────────────────────────────
+@app.get("/api/actividades/plantilla")
+async def descargar_plantilla():
+    """Descarga un Excel vacío con las columnas correctas como plantilla."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Actividades"
+
+    headers = ["quizid", "cmid", "curid", "numero_eval", "numero_intento", "nombre", "texto_correcto"]
+    ws.append(headers)
+
+    # Fila de ejemplo
+    ws.append([12192, 206332, 2679, 1, 1, "U2S1 P1 – Primer intento", "Texto correcto aquí..."])
+
+    # Ajustar ancho de columnas
+    anchos = [10, 10, 10, 13, 15, 30, 50]
+    for i, ancho in enumerate(anchos, 1):
+        ws.column_dimensions[get_column_letter(i)].width = ancho
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_actividades.xlsx"}
+    )
+
+
+# ──────────────────────────────────────────────
+# ENDPOINT — CARGA MASIVA DESDE EXCEL
+# ──────────────────────────────────────────────
+@app.post("/api/actividades/carga-masiva")
+async def carga_masiva(file: UploadFile = File(...)):
+    """
+    Sube un Excel (.xlsx) con columnas:
+    quizid | cmid | curid | numero_eval | numero_intento | nombre | texto_correcto
+    Inserta o actualiza (upsert) cada fila.
+    """
+    if not file.filename.endswith(".xlsx"):
+        raise HTTPException(400, "Solo se aceptan archivos .xlsx")
+
+    contenido = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contenido), data_only=True)
+    ws = wb.active
+
+    # Leer encabezados de la primera fila
+    headers = [str(cell.value).strip().lower() if cell.value else "" for cell in ws[1]]
+    cols_requeridas = {"quizid", "cmid", "curid", "numero_eval", "numero_intento", "texto_correcto"}
+    cols_faltantes  = cols_requeridas - set(headers)
+    if cols_faltantes:
+        raise HTTPException(400, f"Columnas faltantes en el Excel: {', '.join(cols_faltantes)}")
+
+    idx = {h: i for i, h in enumerate(headers)}
+
+    insertados   = 0
+    actualizados = 0
+    errores      = []
+
+    async with pool.acquire() as conn:
+        for num_fila, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if all(v is None for v in row):
+                continue
+            try:
+                quizid         = int(row[idx["quizid"]])
+                cmid           = int(row[idx["cmid"]])
+                curid          = int(row[idx["curid"]])
+                numero_eval    = int(row[idx["numero_eval"]])
+                numero_intento = int(row[idx["numero_intento"]])
+                nombre         = str(row[idx["nombre"]]).strip() if "nombre" in idx and row[idx["nombre"]] else None
+                texto_correcto = str(row[idx["texto_correcto"]]).strip()
+
+                if not texto_correcto:
+                    errores.append(f"Fila {num_fila}: texto_correcto vacío")
+                    continue
+
+                existente = await conn.fetchrow(
+                    "SELECT quizid FROM qch_actividades WHERE quizid=$1", quizid
+                )
+                if existente:
+                    await conn.execute(
+                        """UPDATE qch_actividades
+                           SET cmid=$1, curid=$2, numero_eval=$3, numero_intento=$4,
+                               nombre=$5, texto_correcto=$6
+                           WHERE quizid=$7""",
+                        cmid, curid, numero_eval, numero_intento,
+                        nombre, texto_correcto, quizid
+                    )
+                    actualizados += 1
+                else:
+                    await conn.execute(
+                        """INSERT INTO qch_actividades
+                               (quizid, cmid, curid, numero_eval, numero_intento, nombre, texto_correcto)
+                           VALUES ($1,$2,$3,$4,$5,$6,$7)""",
+                        quizid, cmid, curid, numero_eval, numero_intento,
+                        nombre, texto_correcto
+                    )
+                    insertados += 1
+
+            except Exception as e:
+                errores.append(f"Fila {num_fila}: {str(e)}")
+
+    return {
+        "ok":          True,
+        "insertados":  insertados,
+        "actualizados": actualizados,
+        "errores":     errores,
+    }
 
 
 # ──────────────────────────────────────────────
