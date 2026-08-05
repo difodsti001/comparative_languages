@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Gestor – Comparativa de Lenguas</title>
+<title>Gestor – Comparativa Lenguas</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a1a18;min-height:100vh}
@@ -20,6 +20,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a
 .btn-primary:hover{background:#4840a3}
 .btn-danger{color:#a32d2d;border-color:#f0c8c8}
 .btn-danger:hover{background:#fcebeb}
+.btn-success{background:#2a7b3d;color:#fff;border-color:transparent}
+.btn-success:hover{background:#236032}
 .btn-sm{padding:4px 10px;font-size:12px}
 .act-item{padding:.85rem 1.25rem;border-bottom:.5px solid #f0efe8;cursor:pointer;transition:background .1s}
 .act-item:hover{background:#fafaf7}
@@ -31,8 +33,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a
 .badge-i1{background:#e8f0fe;color:#3b5bdb}
 .badge-i2{background:#e8feee;color:#2a7b3d}
 .empty-list{padding:2rem;text-align:center;font-size:13px;color:#aaa}
-.panel-form{padding:2rem}
-.form-card{background:#fff;border:.5px solid #e0dfd8;border-radius:14px;padding:1.5rem;max-width:640px}
+.panel-form{padding:2rem;overflow-y:auto}
+.form-card{background:#fff;border:.5px solid #e0dfd8;border-radius:14px;padding:1.5rem;max-width:640px;margin-bottom:1.5rem}
 .form-card h2{font-size:15px;font-weight:600;margin-bottom:1.25rem}
 .field{margin-bottom:1rem}
 label{font-size:12px;font-weight:500;color:#888;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
@@ -40,24 +42,36 @@ input,textarea,select{width:100%;font-family:inherit;font-size:13px;padding:8px 
 input:focus,textarea:focus,select:focus{border-color:#534ab7}
 textarea{resize:vertical;min-height:110px;line-height:1.6}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.form-actions{display:flex;gap:8px;margin-top:1.25rem}
+.form-actions{display:flex;gap:8px;margin-top:1.25rem;flex-wrap:wrap}
 .divider{border:none;border-top:.5px solid #e0dfd8;margin:1.25rem 0}
 .alert{border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px}
 .alert-ok{background:#eaf3de;color:#2a7b3d}
 .alert-err{background:#fcebeb;color:#a32d2d}
-.placeholder-form{display:flex;align-items:center;justify-content:center;height:300px;color:#aaa;font-size:14px}
+.alert-warn{background:#fff8e1;color:#7a5c00}
+.placeholder-form{display:flex;align-items:center;justify-content:center;height:200px;color:#aaa;font-size:14px}
+/* Upload zone */
+.upload-zone{border:2px dashed #d0cfc8;border-radius:10px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s}
+.upload-zone:hover,.upload-zone.drag{border-color:#534ab7;background:#f8f7ff}
+.upload-zone p{font-size:14px;color:#888;margin-top:8px}
+.upload-zone .ico{font-size:32px}
+.resultado-masivo{margin-top:12px;font-size:13px}
+.resultado-masivo .stat{display:inline-block;padding:4px 12px;border-radius:99px;margin:3px}
+.stat-ins{background:#e8feee;color:#2a7b3d}
+.stat-upd{background:#e8f0fe;color:#3b5bdb}
+.stat-err{background:#fcebeb;color:#a32d2d}
 </style>
 </head>
 <body>
 <div class="topbar">
   <h1>Gestor de actividades</h1>
-  <span>Comparativa Lengua Central</span>
+  <span>Comparativa Lenguas</span>
   <div style="margin-left:auto">
-    <a href="index.html" style="font-size:13px;color:#534ab7;text-decoration:none">← Ver interfaz docente</a>
+    <a href="/" style="font-size:13px;color:#534ab7;text-decoration:none">← Ver interfaz docente</a>
   </div>
 </div>
 
 <div class="layout">
+  <!-- Lista -->
   <div class="panel-list">
     <div class="panel-list-head">
       <p>Actividades (<span id="count">0</span>)</p>
@@ -66,7 +80,32 @@ textarea{resize:vertical;min-height:110px;line-height:1.6}
     <div id="act-list"><p class="empty-list">Sin actividades registradas.</p></div>
   </div>
 
+  <!-- Formulario -->
   <div class="panel-form">
+
+    <!-- Carga masiva -->
+    <div class="form-card">
+      <h2>📤 Carga masiva desde Excel</h2>
+      <div id="upload-alert"></div>
+      <div class="upload-zone" id="upload-zone"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="onDrop(event)">
+        <div class="ico">📊</div>
+        <strong style="font-size:14px">Arrastra tu Excel aquí o haz clic para seleccionar</strong>
+        <p>Formato .xlsx · Columnas: quizid, cmid, curid, numero_eval, numero_intento, nombre, texto_correcto</p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx" style="display:none" onchange="subirExcel(this.files[0])"/>
+      <div id="resultado-masivo" class="resultado-masivo"></div>
+      <div style="margin-top:12px">
+        <a href="/api/actividades/plantilla" class="btn btn-sm" style="text-decoration:none">
+          ⬇ Descargar plantilla Excel
+        </a>
+      </div>
+    </div>
+
+    <!-- Formulario individual -->
     <div id="form-placeholder" class="placeholder-form">
       Selecciona una actividad o crea una nueva.
     </div>
@@ -133,8 +172,8 @@ textarea{resize:vertical;min-height:110px;line-height:1.6}
 
 <script>
 const API = "__API_BASE__";
-let actividades  = [];
-let editQuizid   = null;
+let actividades = [];
+let editQuizid  = null;
 
 async function cargar() {
   const r = await fetch(`${API}/api/actividades`);
@@ -243,6 +282,57 @@ async function eliminar() {
   if (!confirm(`¿Eliminar la actividad quizid=${editQuizid}?`)) return;
   await fetch(`${API}/api/actividades/${editQuizid}`, { method: "DELETE" });
   cancelar();
+  await cargar();
+}
+
+// ── Carga masiva ──────────────────────────────
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById("upload-zone").classList.remove("drag");
+  const file = e.dataTransfer.files[0];
+  if (file) subirExcel(file);
+}
+
+async function subirExcel(file) {
+  if (!file || !file.name.endsWith(".xlsx")) {
+    document.getElementById("upload-alert").innerHTML =
+      '<div class="alert alert-err">Solo se aceptan archivos .xlsx</div>';
+    return;
+  }
+
+  document.getElementById("upload-alert").innerHTML =
+    '<div class="alert alert-warn">Subiendo y procesando...</div>';
+  document.getElementById("resultado-masivo").innerHTML = "";
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const r = await fetch(`${API}/api/actividades/carga-masiva`, { method: "POST", body: fd });
+  const data = await r.json();
+
+  if (!r.ok) {
+    document.getElementById("upload-alert").innerHTML =
+      `<div class="alert alert-err">${data.detail || "Error al procesar el archivo."}</div>`;
+    return;
+  }
+
+  document.getElementById("upload-alert").innerHTML =
+    '<div class="alert alert-ok">Archivo procesado correctamente.</div>';
+
+  let html = `
+    <span class="stat stat-ins">✓ ${data.insertados} insertados</span>
+    <span class="stat stat-upd">↺ ${data.actualizados} actualizados</span>`;
+
+  if (data.errores && data.errores.length) {
+    html += `<span class="stat stat-err">✗ ${data.errores.length} errores</span>`;
+    html += `<ul style="margin-top:8px;padding-left:1.2rem;color:#a32d2d;font-size:12px">` +
+      data.errores.map(e => `<li>${e}</li>`).join("") + `</ul>`;
+  }
+
+  document.getElementById("resultado-masivo").innerHTML = html;
+
+  // Limpiar input y recargar lista
+  document.getElementById("file-input").value = "";
   await cargar();
 }
 
