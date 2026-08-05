@@ -405,8 +405,9 @@ async def carga_masiva(file: UploadFile = File(...)):
                 curid          = int(row[idx["curid"]])
                 numero_eval    = int(row[idx["numero_eval"]])
                 numero_intento = int(row[idx["numero_intento"]])
-                nombre         = str(row[idx["nombre"]]).strip() if "nombre" in idx and row[idx["nombre"]] else None
+                nombre = str(row[idx["nombre"]]).strip().replace("_x000D_", "").strip() if "nombre" in idx and row[idx["nombre"]] else None
                 texto_correcto = str(row[idx["texto_correcto"]]).strip()
+                texto_correcto = texto_correcto.replace("_x000D_", "\n").strip()
 
                 if not texto_correcto:
                     errores.append(f"Fila {num_fila}: texto_correcto vacío")
