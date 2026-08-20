@@ -159,7 +159,9 @@ function renderResultado(data) {
   mostrarInfoEval(data);
 
   // Tu respuesta
-  $("bloque-docente").textContent = data.texto_docente || "(sin respuesta registrada)";
+  $("bloque-docente").textContent = data.texto_docente && data.texto_docente.trim()
+    ? data.texto_docente
+    : "No ha respondido a la actividad.";
 
   // Texto correcto solo en intento 2
   if (data.texto_correcto) {

@@ -233,8 +233,7 @@ async def obtener_texto_moodle(quizid: int, id_user: int) -> str:
             if texto:
                 return texto
 
-    raise HTTPException(422,
-        f"No se encontró respuesta essay para userid={id_user} en quizid={quizid}")
+    return ""
 
 
 # ──────────────────────────────────────────────
@@ -480,7 +479,11 @@ async def comparar_y_guardar(req: ComparativaRequest):
             return {"ya_existia": True, **build_respuesta(act, existente)}
 
     texto_docente = await obtener_texto_moodle(req.quizid, req.id_user)
-    cmp           = comparar(act["texto_correcto"], texto_docente)
+    if not texto_docente.strip():
+        texto_docente = ""
+        cmp = {"puntaje": 0, "aciertos": 0, "porcentaje_acierto": 0.0}
+    else:
+        cmp = comparar(act["texto_correcto"], texto_docente)
 
     async with pool.acquire() as conn:
         await conn.execute(
